@@ -76,28 +76,30 @@
     let mouse = { x: W / 2, y: H / 2 };
     let running = false;
 
-    /* ---------- SETUP ---------- */
+    /* ---------- START ---------- */
     function startGame() {
       document.getElementById("menu").style.display = "none";
       canvas.style.display = "block";
       msg.textContent = "Hold mouse button to spray!";
       buildCandles();
+      draw();                // 🔑 FORCE FIRST DRAW
       running = true;
       requestAnimationFrame(loop);
     }
 
+    /* ---------- SETUP ---------- */
     function buildCandles() {
       candles = [];
       flames = [];
       const count = 30;
       const spacing = 24;
       const startX = W / 2 - (count - 1) * spacing / 2;
-      const baseY = 350;
+      const baseY = 360;
 
       for (let i = 0; i < count; i++) {
         const x = startX + i * spacing;
-        candles.push({ x, y: baseY, lit: true });
-        flames.push({ x, y: baseY - 40, size: 28 });
+        candles.push({ x: x, y: baseY });
+        flames.push({ x: x, y: baseY - 36, size: 22 }); // 🔥 smaller flames
       }
     }
 
@@ -113,19 +115,19 @@
     /* ---------- DRAW ---------- */
     function drawCake() {
       ctx.fillStyle = "#5b2c1a";
-      ctx.fillRect(150, 350, 600, 100);
+      ctx.fillRect(150, 360, 600, 100);
     }
 
     function drawCandles() {
+      ctx.fillStyle = "#eee";
       candles.forEach(c => {
-        ctx.fillStyle = "#eee";
         ctx.fillRect(c.x - 4, c.y - 40, 8, 40);
       });
     }
 
     function drawFlames() {
+      ctx.fillStyle = "orange";
       flames.forEach(f => {
-        ctx.fillStyle = "orange";
         ctx.beginPath();
         ctx.arc(f.x, f.y, f.size, 0, Math.PI * 2);
         ctx.fill();
@@ -135,7 +137,7 @@
     function drawSpray() {
       if (!spraying) return;
       ctx.fillStyle = "rgba(255,255,255,.9)";
-      for (let i = 0; i < 25; i++) {
+      for (let i = 0; i < 18; i++) {
         ctx.beginPath();
         ctx.arc(
           mouse.x + Math.random() * 10,
@@ -148,6 +150,14 @@
       }
     }
 
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      drawCake();
+      drawCandles();
+      drawFlames();
+      drawSpray();
+    }
+
     /* ---------- LOGIC ---------- */
     function update() {
       if (!spraying) return;
@@ -155,7 +165,7 @@
       flames = flames.filter(f => {
         const dx = f.x - mouse.x;
         const dy = f.y - mouse.y;
-        return dx * dx + dy * dy > 1200;
+        return dx * dx + dy * dy > 900;
       });
 
       if (flames.length === 0) {
@@ -167,14 +177,8 @@
     /* ---------- LOOP ---------- */
     function loop() {
       if (!running) return;
-
-      ctx.clearRect(0, 0, W, H);
-      drawCake();
-      drawCandles();
-      drawFlames();
-      drawSpray();
+      draw();
       update();
-
       requestAnimationFrame(loop);
     }
   </script>
