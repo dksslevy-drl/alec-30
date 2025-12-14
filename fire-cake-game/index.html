@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fire Cake — Alec Turns 30</title>
+  <style>
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0c0c0c;
+      color: #f4f0e6;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      padding: 16px;
+    }
+
+    .wrap {
+      width: min(1020px, 96vw);
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 12px 38px rgba(0, 0, 0, 0.45);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      text-align: center
+    }
+
+    .hint {
+      margin-top: 10px;
+      text-align: center;
+      opacity: .85
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 12px
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 800;
+      padding: 12px 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.12);
+      color: #f4f0e6;
+      font-size: 1rem;
+      min-width: 170px;
+      transition: transform .12s ease, background .12s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: rgba(255, 255, 255, 0.16)
+    }
+
+    canvas {
+      display: none;
+      width: 100%;
+      max-width: 1020px;
+      height: auto;
+      background: #000;
+      border-radius: 14px;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.75);
+    }
+
+    .topbar {
+      display: none;
+      margin: 12px 0 10px;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      font-size: .95rem;
+    }
+
+    .mini {
+      width: auto;
+      min-width: auto;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    #msg {
+      margin-top: 10px;
+      min-height: 1.2rem;
+      text-align: center;
+      opacity: .95
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <div id="menu" class="panel">
+      <h1>🔥 Fire Cake — Alec Turns a Wh0ppin" Thirty! OH Shit!!🔥</h1>
+      <div class="hint" style="opacity:.9; font-size:1.8rem; color: rgb(243, 129, 139);">
+        Pick a difficulty. Hold mouse button to spray.<p></p>
+        Put out all the candle flames to save your cake!
+      </div>
+      <div class="row">
+        <button id="easyBtn">Easy</button>
+        <button id="normalBtn">Normal</button>
+        <button id="hardBtn">Hard</button>
+      </div>
+      <div class="hint" style="opacity:.7; font-size:1.3rem;color: rgb(151, 231, 241);">
+        Hope your special day is magical. Happy Birthday, Alec! 🎉 You deserve the best. Love You!!
+      </div>
+    </div>
+
+    <div id="topbar" class="topbar">s
+      <div id="pill" class="pill"></div>
+      <div style="display:flex; gap:14px; flex-wrap:wrap;">
+        <button id="resetBtn" class="mini">Reset 🔁</button>
+        <button id="menuBtn" class="mini">Menu ☰</button>
+      </div>
+    </div>
+
+    <!-- We render internally smaller for speed; CSS scales it up -->
+    <canvas id="cv" width="900" height="500"></canvas>
+    <div id="msg"></div>
+
+  </div>
+
+  <script>
+    /* =========================
+       DOM
+    ========================= */
+    const menuEl = document.getElementById("menu");
+    const topbarEl = document.getElementById("topbar");
+    const pillEl = document.getElementById("pill");
+    const msgEl = document.getElementById("msg");
+
+    const easyBtn = document.getElementById("easyBtn");
+    const normalBtn = document.getElementById("normalBtn");
+    const hardBtn = document.getElementById("hardBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const menuBtn = document.getElementById("menuBtn");
+
+    const canvas = document.getElementById("cv");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+
+    ctx.imageSmoothingEnabled = true;
+
+    /* =========================
+       ASSETS
+    ========================= */
+    function loadImage(src) {
+      const img = new Image();
+      img.src = src;
+      return img;
+    }
+    const cakeImg = loadImage("cake.jpg");
+    const candleImg = loadImage("candle.png");
+    const extImg = loadImage("extinguisher.png");
+
+    let cakeReady = false, candleReady = false, extReady = false;
+    cakeImg.onload = () => cakeReady = true;
+    candleImg.onload = () => candleReady = true;
+    extImg.onload = () => extReady = true;
+
+    /* =========================
+       GAME CONFIG
+    ========================= */
+    const personName = "ALEC";
+    const candleCount = 30;
+    const candleLayout = "cluster";
+
+    let running = false, gameOver = false;
+    let difficulty = "normal";
+
+    let cake = { x: 0, y: 0, w: 0, h: 0 };
+
+    let mouseX = W / 2, mouseY = H / 2;
+    let spraying = false;
+
+    let sprayRadius = 64;
+    let winThreshold = 0.10;
+    let regrowRate = 0.11;
+
+    // candles
+    let candlePositions = [];
+    let fireHealth = [];
+
+    // FAST particles (caps are low on purpose)
+    let flames = [];
+    let smoke = [];
+    let sprayParticles = [];
+
+    // Caps tuned for smoothness
+    const MAX_FLAMES = 520;
+    const MAX_SMOKE = 260;
+    const MAX_SPRAY = 420;
+
+    let nozzleX = 0, nozzleY = 0;
+    let lastTime = 0;
+
+    /* =========================
+       PRE-RENDERED FLAME SPRITE (HUGE performance win)
+    ========================= */
+    const flameSprite = document.createElement("canvas");
+    flameSprite.width = 64;
+    flameSprite.height = 64;
+    const fctx = flameSprite.getContext("2d");
+
+    // build a nice warm flame blob once
+    (function buildFlameSprite() {
+      fctx.clearRect(0, 0, 64, 64);
+
+      // outer glow
+      let g1 = fctx.createRadialGradient(32, 34, 4, 32, 34, 28);
+      g1.addColorStop(0.0, "rgba(255,220,140,0.55)");
+      g1.addColorStop(0.35, "rgba(255,150,60,0.35)");
+      g1.addColorStop(1.0, "rgba(255,80,20,0)");
+      fctx.fillStyle = g1;
+      fctx.beginPath();
+      fctx.ellipse(32, 36, 18, 26, 0, 0, Math.PI * 2);
+      fctx.fill();
+
+      // inner core
+      let g2 = fctx.createRadialGradient(32, 34, 2, 32, 34, 16);
+      g2.addColorStop(0.0, "rgba(255,250,220,0.85)");
+      g2.addColorStop(0.45, "rgba(255,210,120,0.55)");
+      g2.addColorStop(1.0, "rgba(255,120,40,0)");
+      fctx.fillStyle = g2;
+      fctx.beginPath();
+      fctx.ellipse(32, 34, 10, 18, 0, 0, Math.PI * 2);
+      fctx.fill();
+    })();
+
+    /* =========================
+       HELPERS
+    ========================= */
+    function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+    function rand(a, b) { return a + Math.random() * (b - a); }
+
+    /* =========================
+       DIFFICULTY
+    ========================= */
+    function applyDifficulty(level) {
+      difficulty = level;
+      if (level === "easy") {
+        regrowRate = 0.07;
+        sprayRadius = 80;
+        winThreshold = 0.13;
+      } else if (level === "hard") {
+        regrowRate = 0.16;
+        sprayRadius = 56;
+        winThreshold = 0.08;
+      } else {
+        regrowRate = 0.11;
+        sprayRadius = 64;
+        winThreshold = 0.10;
+      }
+    }
+
+    /* =========================
+       CAKE + CANDLES
+    ========================= */
+    function computeCake() {
+      cake.w = W * 0.80;
+      cake.h = 400 * (H / 500);
+      cake.x = (W - cake.w) / 2;
+      cake.y = H - cake.h - 52 * (H / 500);
+    }
+
+    function buildCandles() {
+      candlePositions = [];
+      fireHealth = [];
+      const n = clamp(candleCount, 1, 150);
+      const topY = cake.y - 10;
+
+      if (candleLayout === "ring") {
+        const cx = W / 2, rx = cake.w * 0.34, ry = 26 * (H / 500);
+        for (let i = 0; i < n; i++) {
+          const t = (i / n) * Math.PI * 2;
+          candlePositions.push({ x: cx + Math.cos(t) * rx, y: topY + Math.sin(t) * ry });
+          fireHealth.push(1);
+        }
+      } else {
+        const left = cake.x + cake.w * 0.22, right = cake.x + cake.w * 0.78
+        for (let k = 0; k < n; k++) {
+          candlePositions.push({ x: rand(left, right), y: topY + rand(-10, 10) });
+          fireHealth.push(1);
+        }
+      }
+    }
+
+    /* =========================
+       FLAMES (optimized)
+    ========================= */
+    function spawnFlames(dt) {
+      for (let i = 0; i < candlePositions.length; i++) {
+        const h = fireHealth[i];
+        if (h <= 0.01) continue;
+
+        // lower emission than before (smooth)
+        let emit = Math.floor((22 + 46 * h) * dt);
+        if (emit > 4) emit = 4;
+
+        const c = candlePositions[i];
+        for (let e = 0; e < emit; e++) {
+          if (flames.length >= MAX_FLAMES) break;
+          flames.push({
+            x: c.x + rand(-5, 5),
+            y: (c.y - 52) + rand(-2, 6),
+            vx: rand(-18, 18),
+            vy: rand(-200, -120),
+            life: rand(0.22, 0.42),
+            maxLife: 0,
+            size: rand(18, 28) * (0.55 + 0.7 * h),
+            heat: h,
+            wob: rand(0, Math.PI * 2)
+          });
+          flames[flames.length - 1].maxLife = flames[flames.length - 1].life;
+
+          if (smoke.length < MAX_SMOKE && Math.random() < 0.25) {
+            smoke.push({
+              x: c.x + rand(-6, 6),
+              y: (c.y - 64) + rand(-4, 4),
+              vx: rand(-10, 10),
+              vy: rand(-55, -20),
+              life: rand(0.55, 1.05),
+              maxLife: 0,
+              r: rand(10, 16)
+            });
+            smoke[smoke.length - 1].maxLife = smoke[smoke.length - 1].life;
+          }
+        }
+      }
+    }
+
+    function updateFlames(dt) {
+      for (let i = flames.length - 1; i >= 0; i--) {
+        const p = flames[i];
+        p.life -= dt;
+        if (p.life <= 0) { flames.splice(i, 1); continue; }
+
+        p.vx += Math.sin(p.wob + (p.maxLife - p.life) * 18) * 30 * dt;
+        p.vx *= (1 - 0.85 * dt);
+        p.vy += 90 * dt;
+
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.size *= (1 - 0.85 * dt);
+      }
+
+      for (let i = smoke.length - 1; i >= 0; i--) {
+        const s = smoke[i];
+        s.life -= dt;
+        if (s.life <= 0) { smoke.splice(i, 1); continue; }
+        s.vx *= (1 - 0.5 * dt);
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        s.r *= (1 + 0.10 * dt);
+      }
+    }
+
+    /* =========================
+       SPRAY (optimized bubbly dots)
+    ========================= */
+    function applySpray(dt) {
+      if (!spraying || gameOver) return;
+
+      const r2 = sprayRadius * sprayRadius;
+
+      for (let i = 0; i < candlePositions.length; i++) {
+        const c = candlePositions[i];
+        const tx = c.x, ty = c.y - 54;
+        const dx = tx - mouseX, dy = ty - mouseY;
+        if (dx * dx + dy * dy <= r2) {
+          fireHealth[i] = Math.max(0, fireHealth[i] - 2.2 * dt);
+        }
+      }
+
+      // fewer dots than before, but thicker/clearer
+      for (let k = 0; k < 10; k++) {
+        if (sprayParticles.length >= MAX_SPRAY) break;
+        sprayParticles.push({
+          x: nozzleX + rand(-1, 2),
+          y: nozzleY + rand(-1, 2),
+          vx: rand(320, 520),
+          vy: rand(-340, -160),
+          life: rand(0.18, 0.32),
+          r: rand(2.5, 5.5)
+        });
+      }
+
+      for (let j = flames.length - 1; j >= 0; j--) {
+        const p = flames[j];
+        const dx = p.x - mouseX, dy = p.y - mouseY;
+        if (dx * dx + dy * dy <= r2) {
+          p.life -= 3.2 * dt;
+        }
+      }
+    }
+
+    function updateSpray(dt) {
+      for (let i = sprayParticles.length - 1; i >= 0; i--) {
+        const p = sprayParticles[i];
+        p.life -= dt;
+        if (p.life <= 0) { sprayParticles.splice(i, 1); continue; }
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 240 * dt;
+      }
+    }
+
+    /* =========================
+       REGROW (winnable)
+    ========================= */
+    function regrow(dt) {
+      if (gameOver) return;
+
+      const blockR = sprayRadius * 1.1, blockR2 = blockR * blockR;
+      for (let i = 0; i < fireHealth.length; i++) {
+        const c = candlePositions[i];
+        const tx = c.x, ty = c.y - 54;
+        const dx = tx - mouseX, dy = ty - mouseY;
+        const beingSprayed = spraying && (dx * dx + dy * dy <= blockR2);
+        if (!beingSprayed) {
+          fireHealth[i] = Math.min(1, fireHealth[i] + regrowRate * dt);
+        }
+      }
+    }
+
+    function averageFire() {
+      let sum = 0;
+      for (let i = 0; i < fireHealth.length; i++) sum += fireHealth[i];
+      return sum / Math.max(1, fireHealth.length);
+    }
+
+    /* =========================
+       DRAW
+    ========================= */
+    function drawBackground() {
+      ctx.clearRect(0, 0, W, H);
+      const g = ctx.createRadialGradient(W / 2, H * 0.55, 60, W / 2, H * 0.55, 760);
+      g.addColorStop(0, "rgba(255,210,140,0.08)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    function drawCake() {
+      if (cakeReady) {
+        ctx.drawImage(cakeImg, cake.x, cake.y, cake.w, cake.h);
+      } else {
+        ctx.fillStyle = "#3b1b12";
+        ctx.fillRect(cake.x, cake.y, cake.w, cake.h);
+      }
+
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(255,215,0,0.95)";
+      ctx.font = "bold 26px Arial";
+      ctx.fillText("HAPPY 30th Birthday, " + personName + "!", W / 2, cake.y + cake.h * 1.2);
+      ctx.restore();
+    }
+
+    function drawCandles() {
+      for (let i = 0; i < candlePositions.length; i++) {
+        const c = candlePositions[i];
+        const x = c.x, y = c.y;
+        const h = fireHealth[i];
+
+        // candle asset scaled to canvas size
+        const cw = 11, ch = 52;
+        if (candleReady) {
+          ctx.drawImage(candleImg, x - cw / 2, y - ch, cw, ch);
+        } else {
+          ctx.fillStyle = "rgba(245,245,245,0.95)";
+          ctx.fillRect(x - 3, y - 50, 6, 50);
+        }
+
+        // tiny wick glow
+        if (h > 0.02) {
+          ctx.save();
+          ctx.globalAlpha = 0.7 * h;
+          ctx.fillStyle = "rgba(255,220,160,0.9)";
+          ctx.beginPath();
+          ctx.arc(x, y - 54, 2.0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+
+    function drawSmoke() {
+      ctx.save();
+      for (const s of smoke) {
+        const t = s.life / s.maxLife;
+        const a = 0.20 * t;
+        ctx.fillStyle = "rgba(120,120,120," + a + ")";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawFlames() {
+      // Additive blending once (fast), then draw sprites
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (const p of flames) {
+        const t = p.life / p.maxLife;
+        const a = clamp(0.95 * t, 0, 1) * (0.75 + Math.random() * 0.25);
+        ctx.globalAlpha = a;
+
+        // sprite draw: scale based on particle size
+        const s = p.size;
+        ctx.drawImage(flameSprite, p.x - s / 2, p.y - s / 2, s, s);
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+
+    function drawSpray() {
+      for (const p of sprayParticles) {
+        const a = 0.65 + Math.random() * 0.35;
+        ctx.fillStyle = "rgba(255,255,255," + a + ")";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawExtinguisherFollower() {
+      const width = 60, height = 90;
+      const ex = mouseX - 10;
+      const ey = mouseY - height + 10;
+
+      nozzleX = ex + width - 4;
+      nozzleY = ey + 18;
+
+      if (extReady) {
+        ctx.drawImage(extImg, ex, ey, width, height);
+      } else {
+        ctx.fillStyle = "#c00";
+        ctx.fillRect(ex, ey, width, height);
+      }
+    }
+
+    function drawFrame() {
+      drawBackground();
+      computeCake();
+      drawCake();
+      drawCandles();
+      drawSmoke();
+      drawFlames();
+      drawSpray();
+      drawExtinguisherFollower();
+    }
+
+    /* =========================
+       LOOP
+    ========================= */
+    function loop(ts) {
+      if (!running) return;
+      if (!lastTime) lastTime = ts;
+      let dt = (ts - lastTime) / 1000;
+      lastTime = ts;
+      dt = clamp(dt, 0, 0.05);
+
+      if (!gameOver) {
+        applySpray(dt);
+        regrow(dt);
+        spawnFlames(dt);
+        updateFlames(dt);
+        updateSpray(dt);
+
+        if (averageFire() < winThreshold) {
+          gameOver = true;
+          msgEl.textContent = "Saved from the HEAT! It's time to EAT!  Enjoy your cake for Heaven's sake! Happy 30th " + personName + "! 🎉";
+        }
+      } else {
+        spawnFlames(dt * 0.10);
+        updateFlames(dt);
+        updateSpray(dt);
+      }
+
+      drawFrame();
+      requestAnimationFrame(loop);
+    }
+
+    /* =========================
+       INPUT
+    ========================= */
+    function updateMouse(e) {
+      const rect = canvas.getBoundingClientRect();
+      mouseX = e.clientX - rect.left;
+      mouseY = e.clientY - rect.top;
+    }
+    canvas.addEventListener("mousemove", updateMouse);
+    canvas.addEventListener("mousedown", updateMouse);
+
+    window.addEventListener("mousedown", () => spraying = true);
+    window.addEventListener("mouseup", () => spraying = false);
+
+    /* =========================
+       START/RESET/MENU
+    ========================= */
+    function start(level) {
+      applyDifficulty(level);
+
+      menuEl.style.display = "none";
+      topbarEl.style.display = "flex";
+      canvas.style.display = "block";
+
+      pillEl.textContent = "Alec — 30 candles — " + level.toUpperCase();
+      msgEl.textContent = "Hold mouse button to spray. Put out the flames!";
+
+      computeCake();
+      buildCandles();
+
+      flames = []; smoke = []; sprayParticles = [];
+      gameOver = false;
+      lastTime = 0;
+
+      running = true;
+      requestAnimationFrame(loop);
+    }
+
+    function reset() {
+      computeCake();
+      buildCandles();
+      flames = []; smoke = []; sprayParticles = [];
+      gameOver = false;
+      msgEl.textContent = "Reset! Put out the flames again.";
+    }
+
+    function backToMenu() {
+      running = false;
+      spraying = false;
+      canvas.style.display = "none";
+      topbarEl.style.display = "none";
+      menuEl.style.display = "block";
+      msgEl.textContent = "";
+    }
+
+    easyBtn.addEventListener("click", () => start("easy"));
+    normalBtn.addEventListener("click", () => start("normal"));
+    hardBtn.addEventListener("click", () => start("hard"));
+    resetBtn.addEventListener("click", reset);
+    menuBtn.addEventListener("click", backToMenu);
+  </script>
+</body>
+
+</html>
