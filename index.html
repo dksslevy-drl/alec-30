@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fire Cake — Alec Turns 30</title>
+
+  <style>
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0c0c0c;
+      color: #f4f0e6;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      padding: 16px;
+    }
+
+    .wrap {
+      width: min(1020px, 96vw);
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 12px 38px rgba(0, 0, 0, .45);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      text-align: center
+    }
+
+    .hint {
+      margin-top: 10px;
+      text-align: center;
+      opacity: .85
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 12px
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 800;
+      padding: 12px 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, .14);
+      background: rgba(255, 255, 255, .12);
+      color: #f4f0e6;
+      font-size: 1rem;
+      min-width: 170px;
+    }
+
+    canvas {
+      display: none;
+      width: 100%;
+      max-width: 1020px;
+      background: #000;
+      border-radius: 14px;
+      box-shadow: 0 0 30px rgba(0, 0, 0, .75);
+    }
+
+    .topbar {
+      display: none;
+      margin: 12px 0 10px;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, .14);
+      background: rgba(255, 255, 255, .06);
+    }
+
+    .mini {
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    #msg {
+      margin-top: 10px;
+      text-align: center
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <div id="menu" class="panel">
+      <h1>🔥 Fire Cake — Alec Turns a Wh0ppin’ 30 🔥</h1>
+      <div class="hint" style="font-size:1.5rem;color:#f3818b">
+        Pick a difficulty. Hold mouse button to spray.
+      </div>
+      <div class="row">
+        <button id="easyBtn">Easy</button>
+        <button id="normalBtn">Normal</button>
+        <button id="hardBtn">Hard</button>
+      </div>
+      <div class="hint" style="font-size:1.2rem;color:#97e7f1">
+        Happy Birthday Alec — save the cake, then eat it 🎂
+      </div>
+    </div>
+
+    <div id="topbar" class="topbar">
+      <div id="pill" class="pill"></div>
+      <div>
+        <button id="resetBtn" class="mini">Reset 🔁</button>
+        <button id="menuBtn" class="mini">Menu ☰</button>
+      </div>
+    </div>
+
+    <canvas id="cv" width="900" height="500"></canvas>
+    <div id="msg"></div>
+
+  </div>
+
+  <script>
+    const canvas = document.getElementById("cv");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+
+    const cakeImg = new Image(); cakeImg.src = "cake.jpg";
+    const candleImg = new Image(); candleImg.src = "candle.png";
+    const extImg = new Image(); extImg.src = "extinguisher.png";
+
+    let cake = { x: 0, y: 0, w: 0, h: 0 };
+    let candlePositions = [], fireHealth = [];
+    const personName = "ALEC";
+    const requestedCandles = 30;
+
+    let mouseX = W / 2, mouseY = H / 2, spraying = false;
+    let running = false, gameOver = false;
+    let difficulty = "normal";
+
+    let sprayRadius = 64, regrowRate = .11, winThreshold = .10;
+
+    const flames = [], smoke = [], sprayParticles = [];
+    const MAX_FLAMES = 500, MAX_SPRAY = 420;
+
+    function clamp(n, a, b) { return Math.max(a, Math.min(b, n)) }
+    function rand(a, b) { return a + Math.random() * (b - a) }
+
+    function computeCake() {
+      cake.w = W * .8;
+      cake.h = H * .6;
+      cake.x = (W - cake.w) / 2;
+      cake.y = H - cake.h - 30;
+    }
+
+    /* ========= SMART CANDLE LAYOUT ========= */
+    function buildCandles() {
+      candlePositions = []; fireHealth = [];
+      const usableWidth = cake.w * .7;
+      const spacing = 22;
+      const maxCandles = Math.floor(usableWidth / spacing);
+      const count = Math.min(requestedCandles, maxCandles);
+
+      const startX = W / 2 - (count - 1) * spacing / 2;
+      const baseY = cake.y + 8; // embedded in frosting
+
+      for (let i = 0; i < count; i++) {
+        candlePositions.push({
+          x: startX + i * spacing,
+          y: baseY
+        });
+        fireHealth.push(1);
+      }
+    }
+
+    /* ========= DRAW ========= */
+    function drawCake() {
+      ctx.drawImage(cakeImg, cake.x, cake.y, cake.w, cake.h);
+      ctx.fillStyle = "rgba(0,0,0,.15)";
+      candlePositions.forEach(c => {
+        ctx.beginPath();
+        ctx.ellipse(c.x, c.y + 2, 7, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function drawCandles() {
+      candlePositions.forEach((c, i) => {
+        ctx.drawImage(candleImg, c.x - 6, c.y - 52, 12, 52);
+        if (fireHealth[i] > 0) {
+          ctx.fillStyle = "rgba(255,220,160,.9)";
+          ctx.beginPath();
+          ctx.arc(c.x, c.y - 48, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+    }
+
+    function spawnFlames(dt) {
+      candlePositions.forEach((c, i) => {
+        if (fireHealth[i] <= 0) return;
+        if (flames.length >= MAX_FLAMES) return;
+        flames.push({
+          x: c.x + rand(-4, 4),
+          y: c.y - 48,
+          vx: rand(-20, 20),
+          vy: rand(-160, -120),
+          life: .4
+        });
+      });
+    }
+
+    function updateFlames(dt) {
+      for (let i = flames.length - 1; i >= 0; i--) {
+        const f = flames[i];
+        f.life -= dt;
+        if (f.life <= 0) { flames.splice(i, 1); continue; }
+        f.vy += 80 * dt;
+        f.x += f.vx * dt;
+        f.y += f.vy * dt;
+      }
+    }
+
+    function drawFlames() {
+      ctx.fillStyle = "orange";
+      flames.forEach(f => {
+        ctx.globalAlpha = Math.random();
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    function applySpray(dt) {
+      if (!spraying) return;
+      candlePositions.forEach((c, i) => {
+        const dx = c.x - mouseX, dy = (c.y - 48) - mouseY;
+        if (dx * dx + dy * dy < sprayRadius * sprayRadius) {
+          fireHealth[i] = Math.max(0, fireHealth[i] - 2 * dt);
+        }
+      });
+    }
+
+    function averageFire() {
+      return fireHealth.reduce((a, b) => a + b, 0) / fireHealth.length;
+    }
+
+    function drawExt() {
+      ctx.drawImage(extImg, mouseX - 30, mouseY - 80, 60, 90);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      computeCake();
+      drawCake();
+      drawCandles();
+      drawFlames();
+      drawExt();
+    }
+
+    let last = 0;
+    function loop(ts) {
+      if (!running) return;
+      const dt = (ts - last) / 1000 || 0; last = ts;
+      if (!gameOver) {
+        applySpray(dt);
+        spawnFlames(dt);
+        updateFlames(dt);
+        if (averageFire() < winThreshold) {
+          gameOver = true;
+          document.getElementById("msg").textContent =
+            "🔥 Saved the cake! Eat up, Alec! 🔥";
+        }
+      }
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    canvas.addEventListener("mousemove", e => {
+      const r = canvas.getBoundingClientRect();
+      mouseX = e.clientX - r.left;
+      mouseY = e.clientY - r.top;
+    });
+    window.addEventListener("mousedown", () => spraying = true);
+    window.addEventListener("mouseup", () => spraying = false);
+
+    function start(level) {
+      difficulty = level;
+      document.getElementById("menu").style.display = "none";
+      document.getElementById("topbar").style.display = "flex";
+      canvas.style.display = "block";
+      buildCandles();
+      running = true; gameOver = false;
+      requestAnimationFrame(loop);
+    }
+
+    easyBtn.onclick = () => start("easy");
+    normalBtn.onclick = () => start("normal");
+    hardBtn.onclick = () => start("hard");
+    resetBtn.onclick = () => buildCandles();
+    menuBtn.onclick = () => location.reload();
+  </script>
+</body>
+
+</html>
