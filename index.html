@@ -148,10 +148,10 @@
 
     let cake = { x: 0, y: 0, w: 0, h: 0 };
     let candlePositions = [], fireHealth = [];
-    let flames = [], sprayParticles = [];
+    let flames = [];
     let mouseX = W / 2, mouseY = H / 2;
     let spraying = false, running = false, gameOver = false;
-    let sprayRadius = 64, regrowRate = .11, winThreshold = .10;
+    let sprayRadius = 64, winThreshold = .10;
     let lastTime = 0;
 
     const MAX_FLAMES = 500;
@@ -180,26 +180,26 @@
       }
     }
 
-    /* ================= FLAMES (FIXED) ================= */
+    /* ================= FLAMES ================= */
     function spawnFlames(dt) {
       for (let i = 0; i < candlePositions.length; i++) {
         const h = fireHealth[i];
         if (h <= .02) continue;
 
-        let emit = Math.floor((18 + 40 * h) * dt);
+        let emit = Math.floor((20 + 42 * h) * dt);
         emit = Math.min(emit, 3);
 
         const c = candlePositions[i];
         for (let e = 0; e < emit; e++) {
           if (flames.length >= MAX_FLAMES) return;
           flames.push({
-            x: c.x + rand(-3, 3),
+            x: c.x + rand(-4, 4),
             y: c.y - 48,
-            vx: rand(-12, 12),
-            vy: rand(-120, -80),
-            life: rand(.35, .55),
+            vx: rand(-14, 14),
+            vy: rand(-150, -100),
+            life: rand(.45, .65),
             maxLife: 0,
-            size: rand(14, 22)
+            size: rand(22, 34)
           });
           flames.at(-1).maxLife = flames.at(-1).life;
         }
@@ -212,10 +212,10 @@
         f.life -= dt;
         if (f.life <= 0) { flames.splice(i, 1); continue; }
         f.vy += 60 * dt;
-        f.vx *= 1 - .8 * dt;
+        f.vx *= 1 - .75 * dt;
         f.x += f.vx * dt;
         f.y += f.vy * dt;
-        f.size *= 1 - .7 * dt;
+        f.size *= 1 - .45 * dt;
       }
     }
 
@@ -314,7 +314,7 @@
     window.addEventListener("mouseup", () => spraying = false);
 
     /* ================= START ================= */
-    function start(level) {
+    function start() {
       document.getElementById("menu").style.display = "none";
       document.getElementById("topbar").style.display = "flex";
       canvas.style.display = "block";
@@ -326,9 +326,9 @@
       requestAnimationFrame(loop);
     }
 
-    easyBtn.onclick = () => start("easy");
-    normalBtn.onclick = () => start("normal");
-    hardBtn.onclick = () => start("hard");
+    easyBtn.onclick = start;
+    normalBtn.onclick = start;
+    hardBtn.onclick = start;
     resetBtn.onclick = buildCandles;
     menuBtn.onclick = () => location.reload();
   </script>
